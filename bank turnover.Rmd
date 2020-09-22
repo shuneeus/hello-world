@@ -1,0 +1,209 @@
+---
+title: "Bank turnover"
+output: html_document
+## data from https://www.kaggle.com/barelydedicated/bank-customer-churn-modeling/
+
+---
+
+Analisis del riesgo de fuga de clientes de un banco obtenida de Kaggle. 
+
+
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(janitor)
+library(openxlsx)
+library(readxl)
+library(skimr)
+library(tidymodels)
+library(sjPlot)
+library(glue)
+
+setwd("/home/sebastian/Insync/lshuneeus@uc.cl/Google Drive/data science/kaggle/bank turnover/")
+
+bank <- read_csv("Churn_Modelling.csv") %>% clean_names()
+
+
+```
+
+## Analisis exploratorio de los datos.
+
+Vemos la estructura de la base y su tamaño. Una base con 10.000 clientes de un banco, en que la variable exited indica si un cliente se retira o no del banco. Contiene una serie de otras variables como edad, país, si tiene tarjeta de crédito, género, entre otras. 
+
+```{r  echo=FALSE}
+
+glimpse(bank)
+
+bank<-bank %>% mutate(exited = factor(exited)) 
+```
+
+Vemos si la base es desbalanceada o no. Vemos que el 20% de los clientes se retiraron, por lo que es desbalanceada.  
+```{r  echo=FALSE}
+
+bank %>% tabyl(exited) ## desbalanceado - hay que resamplear 
+
+```
+
+## Modelo logit 
+Se ocupa este modelo lineal generalizado para variable dependiente binaria. Este modelo es apropiado para modelar una variable dependiente binaria. 
+
+```{r  echo=FALSE}
+
+glm1<-glm(exited ~ credit_score + geography +
+             gender + age + tenure + balance 
+            +num_of_products + has_cr_card +
+             is_active_member + estimated_salary,
+             data = bank, family = binomial("logit"))
+
+summary(glm1)
+
+```
+
+Ahora graficamos las probabilidades predichas para cada variable del modelo. Resulta interesante el poder predictivo de la variable genero, país y edad sobre la probabilidad de dejar el banco. 
+
+```{r  echo=FALSE}
+
+covs<-c("credit_score", "geography", "gender", 
+        "age", "tenure", "balance", "num_of_products",
+        "has_cr_card", "is_active_member", "estimated_salary") 
+
+funcion<-function(termino){
+           plot_model(glm1, 
+           type        = "pred",
+           show.ci     = TRUE,
+           terms = termino,
+           title = glue("Probabilidad predicha para {termino}"))}
+
+map(covs, funcion)
+```
+
+
+## Machine learning: GLM / Random Tree
+
+Con una variable dependiente binaria (deja /no deja el banco) se puede entrenar un modelo supervisado de clasificacion. Usaremos y compararemos el performance del random tree model y de una regresion logistica. 
+
+```{r,  include=FALSE}
+
+bank_select <- bank %>%
+    mutate(geography = factor(geography),
+           gender = factor(gender), 
+           exited = factor(exited)) %>% 
+    select(-c(row_number, customer_id, surname)) 
+
+
+# Split data into training and testing sets
+set.seed(1234)
+
+bank_split <- bank_select %>%
+    initial_split(p = 0.8,
+                  strata = exited)
+
+bank_train <- training(bank_split)
+bank_test <- testing(bank_split)
+
+glimpse(bank_train)
+glimpse(bank_test)
+
+### pre process : downsampling to deal with data imbalance
+
+bank_recipe <- recipe(exited ~ ., data = bank_train) %>%   ## downsample on training data! 
+    step_downsample(exited)
+```
+
+### GLM
+Primero entranamos un modelo GLM sobre el 80% de los datos, para luego testearlo sobre el 20% de los datos restantes. La matriz de confusión nos indica que el algoritmo nos pemite predecir correctamente una alta proporción de los clientes que se quedan en el banco, pero tiene mal poder predictivo sobre los que deciden abandonarlo. 
+
+```{r,  echo=FALSE}
+## Specify a glm model
+glm_spec <-logistic_reg() %>%
+    set_engine("glm")
+
+## create a workflow (recipe only)
+bank_wf <- workflow() %>%
+    add_recipe(bank_recipe) 
+
+## Add the model and fit the workflow
+bank_glm <- bank_wf %>%
+    add_model(glm_spec) %>%
+    fit(data = bank_train)
+
+# Print the fitted model
+
+results_glm <- bank_test %>%
+    bind_cols(predict(bank_glm, bank_test) %>%
+                  rename(.pred_glm = .pred_class))
+
+results_glm %>% 
+conf_mat(truth = exited, estimate = .pred_glm)
+
+```
+
+### Random Tree
+Luego entranamos un modelo de random forest también sobre el 80% de los datos, para luego testearlo sobre el 20% de los datos restantes. La matriz de confusión nos indica que el algoritmo nos pemite predecir correctamente una alta proporción de los clientes que se quedan en el banco, pero también tiene mal poder predictivo sobre los que deciden abandonarlo. 
+
+```{r,  echo=FALSE}
+
+## Build a decision tree model
+tree_spec <- decision_tree() %>%         
+    set_engine("rpart") %>%      
+    set_mode("classification") 
+
+
+## Add the model and fit the workflow
+bank_tree <- bank_wf %>%
+    add_model(tree_spec) %>%
+    fit(data = bank_train)
+
+## confusion matrix tree model 
+results_tree <- bank_test %>%
+    bind_cols(predict(bank_tree, bank_test) %>%
+                  rename(.pred_tree = .pred_class))
+
+# Confusion matrix for decision tree model
+results_tree %>%
+    conf_mat(truth = exited, estimate = .pred_tree)
+
+```
+
+### Classification model metrics
+
+Comparamos varias métricas para decicir cual de los dos modelos tiene mejor poder predictivo.  Primero comparamos la precisión 
+
+```{r  echo =FALSE}
+## Calculate accuracy
+accuracy(results_glm, truth = exited, estimate = .pred_glm)
+accuracy(results_tree, truth = exited, estimate = .pred_tree)
+```
+Luego evaluamos el porcentaje de los verdaderos positivos.
+
+```{r  echo =FALSE}
+## Calculate positive predictive value
+ppv(results_glm, truth = exited, estimate = .pred_glm)
+ppv(results_tree, truth = exited, estimate = .pred_tree)
+```
+Por último, evaluamos el porcentaje de los verdaderos negativos.
+
+```{r  echo =FALSE}
+## Calculate negative predictive value
+npv(results_glm, truth = exited, estimate = .pred_glm)
+npv(results_tree, truth = exited, estimate = .pred_tree)
+```
+
+Seleccionamos el modelo random forests. Hacemos un pequeño experimento. Probamos con un conjunto cualquiera de observaciones de la base para ver su poder clasificatorio. 
+
+```{r,  echo=FALSE}
+# A dataframe containing unseen observations
+
+observacion1_20<-bank_select[1:20,]
+
+observacion1_20
+
+prediccion1_20<-predict(bank_tree, observacion1_20, type ="class")
+
+```
+
+Según el modelo random forest, el 10% de las observaciones quedarían incorrectamente clasificados, un margen de error aceptable. 
+```{r,  echo=FALSE}
+table(observacion1_20[,11] == prediccion1_20) 
+
+```
