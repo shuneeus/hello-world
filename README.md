@@ -2,10 +2,13 @@
 
 This repo contains some of my lectures as a teaching assistant in political data analysis. 
 
-## Lecture 5: Building a confidence interval for a sample mean 
-The next code is an example el lecture number 5, for building a 95% confidence interval for the sample mean. The code allows to play with the sample size, the mean and standard deviation of the data, its underlying distribution and the confidence level (z).  
+## Lecture 5: Building a confidence interval for a population mean 
+The next code is an example of statistical inference, now for building a 95% confidence interval for the sample mean. The code allows to play with the sample size, the mean and standard deviation of the data, its underlying distribution and the confidence level (z).  
 
+This exercise serves the pedagogic purpose of showing how different parameters, such as the sample size, and the confidence level, both affect the size of the confidence interval. 
 ```
+set.seed(123) 
+
 sample <- tibble(a=rnorm(100, 2, 4)) 
 
 z<-1.96
