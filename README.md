@@ -1,7 +1,8 @@
-# hello-world
+# Political data analysis 
 
 This repo contains some of my lectures as a teaching assistant in political data analysis. 
-The next code is for building a 95% confidence interval for the population proportion of a categorical variabe. The code allows to play with the sample size (n) and confidence level (z).  
+
+The next code is an example for building a 95% confidence interval for the population proportion of a categorical variabe. The code allows to play with the sample size (n) and confidence level (z).  
 
 
 ```
