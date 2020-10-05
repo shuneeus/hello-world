@@ -1,0 +1,39 @@
+---
+title: "Teaching assistance: Political Data Analysis. Pontificia Universidad Católica de Chile, Political Science Department"
+output: html_document
+---
+
+Sebastián Huneeus, PhD (C) in Political Science
+lshuneeus@uc.cl
+
+## Unit: Statistical inference for one parameter
+### Topic: Statistical inference with a confidence interval for a population mean 
+
+The next code is an example of statistical inference for building a 95% confidence interval for the population mean. The code allows us to manipulate the sample size, the mean, standard deviation, and the confidence level (z).  
+
+This exercise serves the pedagogic purpose of showing how different parameters, such as the sample size and confidence level, affect the length of the confidence interval— larger sample sizes impact more precise estimations. 
+
+We simulate a sample with 100 observations, from a random normal distribution, with mean 2 and standard deviation 4. We set a 95% confidence level, which equals a Z value of approximately 1.96.
+
+```{r, message=FALSE}
+
+library(tidyverse)
+
+```
+
+```{r}
+set.seed(123) 
+
+sample <- tibble(a=rnorm(100, 2, 4))
+
+z<-1.96
+
+tibble(n = nrow(sample), 
+       mean  = mean(sample$a), 
+       se  = sd(sample$a) / sqrt(n), 
+       ci_sup =  mean + z*se,
+       ci_lo = mean + z*-se, 
+       error = (ci_sup - ci_lo)/2) 
+```
+
+The error margin for a 95% confidence level is 0.715. The substantive interpretation is that the actual population mean lies between 3.08 and 1.65, with a confidence level of 95%.  
