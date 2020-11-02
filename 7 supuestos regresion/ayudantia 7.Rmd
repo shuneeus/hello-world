@@ -1,0 +1,163 @@
+---
+title: 'ayudantia 7: simple regression assumptions'
+output: html_document
+---
+
+Sebastián Huneeus
+lshuneeus@uc.cl
+
+Welcome to Linear Regression (OLS: Ordinary Least Squares / Minimos Cuadrados Ordinarios ) 
+
+
+Content of the class
+1.- Simple regression example 
+2.- Simple regression assumptions 
+
+
+## 1.- The simple regression framework 
+
+Predicts values in (\(y\)) given certain values in \(x\). Predictions can be plotted as a line, or curve, depending on the model specification. The estimated slopes and intercept is such that it minimizes the sum of the square of the residuals between the predicted Y values and the observed Y values. 
+
+Basic equation for the simple regression, 
+\[y = \beta_0 + \beta_1x + u\]
+
+We thank Eliana Jung for compiling this data set!  
+
+```{r, echo=F}
+
+library(tidyverse)
+library(haven)
+library(lattice)
+library(janitor)
+options(scipen=999)
+
+plebiscito<-readxl::read_excel("bd_plebiscito.xlsx")  %>% clean_names() %>% 
+ mutate(total_votacion =as.double(total_votacion), 
+        total_mesas = as.double(total_mesas) , 
+        total_electores =  as.double(total_electores), 
+        ingreso_promedio = as.double(ingreso_promedio), 
+        ingresos_municipales_pc=as.double(ingresos_municipales_pc))
+
+head(plebiscito, 10)
+
+```
+
+```{r}
+plebiscito<-plebiscito %>% mutate(porc_apruebo = apruebo / total_votacion) 
+
+plebiscito%>% select(comuna, porc_apruebo) %>% arrange(porc_apruebo)
+```
+
+
+Data distribution 
+```{r}
+plebiscito %>% ggplot(aes(porc_apruebo)) + 
+  geom_histogram(color="black", fill="lightblue",
+                 linetype="dashed", bins = 100) +
+  labs(title = "Histograma porcentaje apruebo")
+
+```
+
+
+Correlation plot 
+```{r}
+plebiscito %>% ggplot(aes(y=porc_apruebo, x = ingresos_municipales_pc)) + geom_point() +
+  labs(title = "Approved vs communal per capita income", x = "Income", y = "Approved")
+```
+ 
+Correlation test 
+
+```{r}
+cor.test(plebiscito$ingresos_municipales_pc, plebiscito$porc_apruebo)
+```
+ 
+Simple regression 
+ 
+```{r}
+ols<-lm(porc_apruebo ~ ingresos_municipales_pc, data = plebiscito)
+```
+
+Model metrics
+```{r}
+summary(ols)
+```
+
+Interpretation: Each change in one unit of X, affects linearly Y in beta. 
+
+```{r}
+library(texreg)
+screenreg(ols, digits = 4)
+```
+
+
+
+## 2.- Gauss Markov Assumptions for the Simple Regression 
+
+
+
+From 1 to 4, we show that $\hat{β}$ is unbiased. From assumptions 1 to 5, we can derive the usual OLS variance formulas. 1 to 5 are the Gauss Markov assumptions 
+
+
+
+1 Linear in parameters 
+In the population model, the dependent variable (\(y\)) is related to the independent variable \(x\)  and the error term (\(u\)). as \[y = \beta_0 + \beta_1x + u\]. 
+
+
+```{r}
+ggplot(data = plebiscito, 
+       aes(x = ingresos_municipales_pc, y=porc_apruebo))+ 
+       geom_point() + 
+       geom_smooth(method = "lm", 
+                   se = F, 
+                   color = "blue")+ 
+       labs (x = "Communal poverty", y = "Porc Approved")
+```
+
+
+2 Random sampling 
+We have a random sample from population. No selection bias in data. 
+
+
+3 Sample variation in X and Y 
+If X and Y variates in the population, random samples must contain variation, unless the population variation is minimal or the sample size is small. 
+
+
+4 Zero conditional mean  
+The error term \(u\) has an expected value of zero given any value of the explanatory variable. In other words, 
+
+ \[E(u|x)=0\]
+ 
+```{r}
+library(car)
+crPlots(ols)
+```
+ 
+5 Homoskedasticity 
+
+The error term \(u\) has the same variance given any value of the explanatory variable \(x\), 
+\(Var(u\mid{x})=\sigma^2\), that is \(Var(u)=\sigma^2\),
+
+```{r}
+plot(ols, which =1)
+```
+
+
+Assumptions from 1 to 5 allow to derive the standard errors of the OLS estimates. When \(Var(u\mid{x})\) depends on x, the error term is said to exhibit heteroskedasticity. 
+
+
+
+6 Normal distribution of the error term 
+
+The error term is normally distributed, with constant variance. 
+\(u_i \sim N (0, \sigma^2)\),
+
+```{r}
+library(car)
+
+qqPlot(ols$residuals)
+```
+
+
+Assumptions 1 to 6 are called the classical linear model assumptions (CLM). From 1 to 6 assumptions, OLS is the minimm variance unbiased estimator. Under the CLM assumptions, the t statistic has t distribution under the null hypothesis. Thus, we can perform hypothesis tests and build conficence intervals for the OLS estimates. 
+
+
